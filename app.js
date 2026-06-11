@@ -793,7 +793,7 @@ function init() {
     const pct = (fracLived() * 100).toFixed(1);
     const daysLeft = Math.round((state.end - clampedNow()) / DAY);
     const text = `I've mined ${pct}% of my lifechain — ${daysLeft.toLocaleString("en-US")} days left on the chain. Forge yours:`;
-    const url = "https://lifechain-tau.vercel.app";
+    const url = location.origin.startsWith("http") ? location.origin : "https://mylifechain.vercel.app";
     const payload = `${text} ${url}`;
     if (navigator.share) {
       try { await navigator.share({ text, url }); return; } catch (_) {}

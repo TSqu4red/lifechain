@@ -1,6 +1,8 @@
 # ⛓ Lifechain
 
-**Like sands through the hourglass… these are the blocks of our lives.**
+**Like sands through the hourglass… these links make up the blocks of our lives.**
+
+Live at [mylifechain.vercel.app](https://mylifechain.vercel.app) (also answers to [blocksofourlives.vercel.app](https://blocksofourlives.vercel.app)).
 
 Plug in your birthday and your expected end date, and Lifechain renders your life four ways:
 
