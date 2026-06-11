@@ -1,6 +1,6 @@
 # ⛓ Lifechain
 
-**Your life, one block at a time.**
+**Like sands through the hourglass… these are the blocks of our lives.**
 
 Plug in your birthday and your expected end date, and Lifechain renders your life four ways:
 

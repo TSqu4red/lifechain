@@ -274,6 +274,48 @@ function renderCrumbs(viewKey, sel) {
   $(sel).innerHTML = parts.join("");
 }
 
+/* Rebuild a drill stack of the same depth, but holding the frames that
+   contain right now — used to roll a finished frame into the next one. */
+function buildStackAtNow(viewKey, depth) {
+  const t = clampedNow().getTime();
+  const stack = [];
+  let parent = {
+    start: state.birth.getTime(),
+    end: state.end.getTime(),
+    unit: viewKey === "weeks" ? "week" : "month",
+  };
+  for (let d = 0; d < depth; d++) {
+    const unitMs = UNIT_MS[parent.unit];
+    const idx = Math.max(0, Math.floor((t - parent.start) / unitMs));
+    const s = parent.start + idx * unitMs;
+    const frame = {
+      start: s,
+      end: Math.min(s + unitMs, parent.end),
+      unit: NEXT_UNIT[parent.unit],
+      label:
+        parent.unit === "week"
+          ? `Week ${Math.floor((t - state.birth.getTime()) / WEEK) + 1}`
+          : frameLabel(parent.unit, new Date(s)),
+    };
+    stack.push(frame);
+    parent = frame;
+  }
+  return stack;
+}
+
+/* If the frame being watched live just ended, follow time into the next
+   one (seconds roll into the next minute, hours into the next hour, …).
+   Frames that ended long ago were opened deliberately — leave them be. */
+function rollForward(viewKey) {
+  const stack = drill[viewKey];
+  if (!stack.length) return;
+  const deepest = stack[stack.length - 1];
+  const t = now().getTime();
+  if (t >= deepest.end && t - deepest.end < 5000 && deepest.end < state.end.getTime()) {
+    drill[viewKey] = buildStackAtNow(viewKey, stack.length);
+  }
+}
+
 /* Push a child frame for cell i of the current frame. */
 function drillInto(viewKey, frame, i) {
   const next = NEXT_UNIT[frame.unit];
@@ -648,7 +690,10 @@ function tick() {
   renderStats();
   updateCountdowns();
 
-  // drilled-in views show hours/minutes/seconds — keep "now" moving
+  // drilled-in views show hours/minutes/seconds — keep "now" moving,
+  // and when a live frame runs out, roll into the next one
+  rollForward("weeks");
+  rollForward("spiral");
   if (drill.weeks.length) renderWeeks();
   if (drill.spiral.length) renderSpiral();
 }
