@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Lifechain — your life, one block at a time</title>
+  <meta name="description" content="Visualize your life as blocks in a chain. Every week mined is immutable. How many blocks are left?">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <header class="site-header">
+    <h1>⛓ LIFECHAIN</h1>
+    <p class="tagline">Your life, one block at a time. Every block mined is immutable. The chain ends — that's what makes it valuable.</p>
+  </header>
+
+  <section class="controls">
+    <div class="field">
+      <label for="birth">Genesis block (your birthday)</label>
+      <input type="date" id="birth">
+    </div>
+    <div class="field">
+      <label for="end">Final block (expected end date)</label>
+      <input type="date" id="end">
+    </div>
+    <div class="field presets">
+      <label>Quick set lifespan</label>
+      <div class="preset-btns">
+        <button data-years="75">75y</button>
+        <button data-years="85">85y</button>
+        <button data-years="95">95y</button>
+        <button data-years="100">100y</button>
+      </div>
+    </div>
+  </section>
+
+  <section class="progress-wrap">
+    <div class="progress-labels">
+      <span id="pct-lived">—</span>
+      <span id="pct-left">—</span>
+    </div>
+    <div class="progress-bar"><div class="progress-fill" id="progress-fill"></div></div>
+  </section>
+
+  <section class="stats" id="stats"></section>
+
+  <nav class="tabs" id="tabs">
+    <button class="tab active" data-view="chain">⛓ Chain</button>
+    <button class="tab" data-view="weeks">▦ Weeks</button>
+    <button class="tab" data-view="spiral">🌀 Spiral</button>
+    <button class="tab" data-view="hourglass">⏳ Hourglass</button>
+  </nav>
+
+  <main>
+    <section class="view active" id="view-chain">
+      <p class="view-hint">One block per year of your life. Confirmed blocks can never be re-mined.</p>
+      <div class="chain-scroll" id="chain"></div>
+    </section>
+
+    <section class="view" id="view-weeks">
+      <p class="view-hint">Every square is one week. <span class="lgd lgd-lived"></span> lived &nbsp;<span class="lgd lgd-now"></span> this week &nbsp;<span class="lgd lgd-future"></span> remaining</p>
+      <div class="weeks-wrap">
+        <div class="weeks-axis" id="weeks-axis"></div>
+        <div class="weeks-grid" id="weeks"></div>
+      </div>
+    </section>
+
+    <section class="view" id="view-spiral">
+      <p class="view-hint">Your life as a spiral of months, spinning outward from birth.</p>
+      <div class="svg-wrap" id="spiral"></div>
+    </section>
+
+    <section class="view" id="view-hourglass">
+      <p class="view-hint">The sand only falls one way.</p>
+      <div class="svg-wrap" id="hourglass"></div>
+      <p class="hourglass-caption" id="hourglass-caption"></p>
+    </section>
+  </main>
+
+  <section class="ticker">
+    <span class="ticker-label">seconds remaining</span>
+    <span class="ticker-value" id="seconds-left">—</span>
+  </section>
+
+  <footer class="site-footer">
+    <p>Memento mori. Built with no dependencies, like all good chains. Data never leaves your browser.</p>
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>
