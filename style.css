@@ -43,25 +43,60 @@ body {
   line-height: 1.5;
 }
 
-/* ---------- controls ---------- */
+/* ---------- controls: 3 guided steps ---------- */
 .controls {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 1.25rem;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(230px, 300px));
+  gap: 1rem;
   justify-content: center;
-  align-items: flex-end;
+  align-items: stretch;
   padding: 1rem;
 }
-.field label {
-  display: block;
-  font-family: var(--mono);
-  font-size: 0.7rem;
-  text-transform: uppercase;
-  letter-spacing: 0.12em;
-  color: var(--muted);
-  margin-bottom: 0.4rem;
+@media (max-width: 880px) {
+  .controls { grid-template-columns: minmax(230px, 380px); }
 }
-.field input[type="date"] {
+.step {
+  display: flex;
+  gap: 0.8rem;
+  background: var(--bg-soft);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 1rem;
+}
+.step-num {
+  flex: 0 0 auto;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: var(--lived);
+  color: #0a0e14;
+  font-family: var(--mono);
+  font-weight: 700;
+  font-size: 0.85rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.step-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  min-width: 0;
+}
+.step-body > label {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text);
+}
+.step-hint {
+  font-family: var(--mono);
+  font-size: 0.65rem;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+.controls input[type="date"] {
   background: var(--panel);
   border: 1px solid var(--border);
   color: var(--text);
@@ -70,11 +105,22 @@ body {
   padding: 0.55rem 0.75rem;
   border-radius: 8px;
   color-scheme: dark;
+  width: 100%;
 }
-.field input[type="date"]:focus {
+.controls input[type="date"]:focus {
   outline: none;
   border-color: var(--lived);
 }
+.fine-tune summary {
+  cursor: pointer;
+  font-family: var(--mono);
+  font-size: 0.7rem;
+  color: var(--muted);
+  user-select: none;
+}
+.fine-tune summary:hover { color: var(--lived); }
+.fine-tune[open] summary { color: var(--lived); }
+.fine-tune .lifespan-inputs { margin-top: 0.6rem; }
 .lifespan-inputs { display: flex; gap: 0.45rem; flex-wrap: wrap; }
 .ls-unit {
   display: flex;
@@ -101,8 +147,7 @@ body {
   text-transform: uppercase;
   letter-spacing: 0.08em;
 }
-.field .preset-btns { margin-top: 0.55rem; justify-content: center; }
-.preset-btns { display: flex; gap: 0.4rem; }
+.preset-btns { display: flex; gap: 0.4rem; flex-wrap: wrap; }
 .preset-btns button {
   background: var(--panel);
   border: 1px solid var(--border);

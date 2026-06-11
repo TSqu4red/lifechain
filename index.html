@@ -17,29 +17,43 @@
   </header>
 
   <section class="controls">
-    <div class="field">
-      <label for="birth">Genesis block (your birthday)</label>
-      <input type="date" id="birth">
-    </div>
-    <div class="field">
-      <label for="end">Final block (expected end date)</label>
-      <input type="date" id="end">
-    </div>
-    <div class="field lifespan">
-      <label>Lifespan — as precise as you like</label>
-      <div class="lifespan-inputs">
-        <span class="ls-unit"><input type="number" id="ls-y" min="0" max="150"><span>yrs</span></span>
-        <span class="ls-unit"><input type="number" id="ls-mo" min="0" max="11"><span>mos</span></span>
-        <span class="ls-unit"><input type="number" id="ls-d" min="0" max="31"><span>days</span></span>
-        <span class="ls-unit"><input type="number" id="ls-h" min="0" max="23"><span>hrs</span></span>
-        <span class="ls-unit"><input type="number" id="ls-mi" min="0" max="59"><span>min</span></span>
-        <span class="ls-unit"><input type="number" id="ls-s" min="0" max="59"><span>sec</span></span>
+    <div class="step">
+      <span class="step-num">1</span>
+      <div class="step-body">
+        <label for="birth">When were you born?</label>
+        <input type="date" id="birth">
+        <p class="step-hint">your genesis block</p>
       </div>
-      <div class="preset-btns">
-        <button data-years="75">75y</button>
-        <button data-years="85">85y</button>
-        <button data-years="95">95y</button>
-        <button data-years="100">100y</button>
+    </div>
+    <div class="step">
+      <span class="step-num">2</span>
+      <div class="step-body">
+        <label>How long do you expect to live?</label>
+        <div class="preset-btns">
+          <button data-years="75">75 yrs</button>
+          <button data-years="85">85 yrs</button>
+          <button data-years="95">95 yrs</button>
+          <button data-years="100">100 yrs</button>
+        </div>
+        <details class="fine-tune">
+          <summary>…or dial it in exactly</summary>
+          <div class="lifespan-inputs">
+            <span class="ls-unit"><input type="number" id="ls-y" min="0" max="150"><span>yrs</span></span>
+            <span class="ls-unit"><input type="number" id="ls-mo" min="0" max="11"><span>mos</span></span>
+            <span class="ls-unit"><input type="number" id="ls-d" min="0" max="31"><span>days</span></span>
+            <span class="ls-unit"><input type="number" id="ls-h" min="0" max="23"><span>hrs</span></span>
+            <span class="ls-unit"><input type="number" id="ls-mi" min="0" max="59"><span>min</span></span>
+            <span class="ls-unit"><input type="number" id="ls-s" min="0" max="59"><span>sec</span></span>
+          </div>
+        </details>
+      </div>
+    </div>
+    <div class="step">
+      <span class="step-num">3</span>
+      <div class="step-body">
+        <label for="end">Your final block</label>
+        <input type="date" id="end">
+        <p class="step-hint">computed for you — or set the date directly</p>
       </div>
     </div>
   </section>
