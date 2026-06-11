@@ -75,6 +75,33 @@ body {
   outline: none;
   border-color: var(--lived);
 }
+.lifespan-inputs { display: flex; gap: 0.45rem; flex-wrap: wrap; }
+.ls-unit {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25rem;
+}
+.ls-unit input {
+  width: 58px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 0.9rem;
+  padding: 0.45rem 0.3rem;
+  border-radius: 8px;
+  text-align: center;
+}
+.ls-unit input:focus { outline: none; border-color: var(--lived); }
+.ls-unit > span {
+  font-family: var(--mono);
+  font-size: 0.6rem;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+.field .preset-btns { margin-top: 0.55rem; justify-content: center; }
 .preset-btns { display: flex; gap: 0.4rem; }
 .preset-btns button {
   background: var(--panel);
@@ -136,9 +163,10 @@ body {
 }
 .stat .num {
   font-family: var(--mono);
-  font-size: 1.25rem;
+  font-size: 1.05rem;
   font-weight: 700;
   color: var(--text);
+  font-variant-numeric: tabular-nums;
 }
 .stat .num.gold { color: var(--lived); }
 .stat .num.green { color: var(--now); }
@@ -296,6 +324,17 @@ body {
 }
 .crumbs button:hover { color: var(--lived); border-color: var(--lived); }
 .crumbs button:last-of-type { color: var(--text); border-color: var(--muted); }
+
+.frame-countdown {
+  text-align: center;
+  font-family: var(--mono);
+  font-size: 0.85rem;
+  color: var(--danger);
+  margin-bottom: 1.1rem;
+  min-height: 1.2em;
+  font-variant-numeric: tabular-nums;
+}
+.frame-countdown.done { color: var(--lived); }
 
 .drill-grid { display: grid; gap: 10px; }
 .drill-grid[data-unit="day"] { grid-template-columns: repeat(7, 84px); grid-auto-rows: 84px; }

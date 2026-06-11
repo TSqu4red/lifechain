@@ -15,7 +15,7 @@ const state = {
 function save() {
   localStorage.setItem(
     "lifechain",
-    JSON.stringify({ birth: iso(state.birth), end: iso(state.end) })
+    JSON.stringify({ birth: iso(state.birth), end: state.end.toISOString() })
   );
 }
 function load() {
@@ -67,6 +67,67 @@ function fmt(n) {
 function pad2(n) {
   return String(n).padStart(2, "0");
 }
+function fmtDec(n, dp) {
+  return n.toLocaleString("en-US", {
+    minimumFractionDigits: dp,
+    maximumFractionDigits: dp,
+  });
+}
+
+/* compact countdown: "122d 03:14:07" */
+function dhmsC(ms) {
+  ms = Math.max(0, ms);
+  const d = Math.floor(ms / DAY);
+  const h = Math.floor((ms % DAY) / 3600000);
+  const m = Math.floor((ms % 3600000) / 60000);
+  const s = Math.floor((ms % 60000) / 1000);
+  return (d ? d + "d " : "") + `${pad2(h)}:${pad2(m)}:${pad2(s)}`;
+}
+
+/* ---------- lifespan: the master clock everything derives from ---------- */
+function addLifespan(birth, p) {
+  const d = new Date(birth);
+  d.setFullYear(d.getFullYear() + p.years);
+  d.setMonth(d.getMonth() + p.months);
+  d.setDate(d.getDate() + p.days);
+  d.setHours(
+    d.getHours() + p.hours,
+    d.getMinutes() + p.minutes,
+    d.getSeconds() + p.seconds
+  );
+  return d;
+}
+
+/* calendar-aware: how many years/months/days/h/m/s fit between two dates */
+function lifespanBreakdown(from, to) {
+  const cur = new Date(from);
+  let years = 0;
+  let months = 0;
+  for (;;) {
+    const t = new Date(cur);
+    t.setFullYear(t.getFullYear() + 1);
+    if (t <= to) { cur.setFullYear(cur.getFullYear() + 1); years++; } else break;
+  }
+  for (;;) {
+    const t = new Date(cur);
+    t.setMonth(t.getMonth() + 1);
+    if (t <= to) { cur.setMonth(cur.getMonth() + 1); months++; } else break;
+  }
+  let rem = to - cur;
+  const days = Math.floor(rem / DAY); rem -= days * DAY;
+  const hours = Math.floor(rem / 3600000); rem -= hours * 3600000;
+  const minutes = Math.floor(rem / 60000); rem -= minutes * 60000;
+  const seconds = Math.floor(rem / 1000);
+  return { years, months, days, hours, minutes, seconds };
+}
+
+function readLifespan() {
+  const v = (id) => Math.max(0, Number($(id).value) || 0);
+  return {
+    years: v("#ls-y"), months: v("#ls-mo"), days: v("#ls-d"),
+    hours: v("#ls-h"), minutes: v("#ls-mi"), seconds: v("#ls-s"),
+  };
+}
 
 /* ---------- stats ---------- */
 function renderStats() {
@@ -81,9 +142,9 @@ function renderStats() {
   const booksLeft = Math.floor((daysLeft / 365.25) * 12); // 12 books/yr
 
   const items = [
-    { num: fmt(daysLived), lbl: "days mined", cls: "gold" },
-    { num: fmt(daysLeft), lbl: "days left", cls: "green" },
-    { num: fmt(weeksLeft), lbl: "weeks left", cls: "green" },
+    { num: fmtDec(daysLived, 5), lbl: "days mined", cls: "gold" },
+    { num: fmtDec(daysLeft, 5), lbl: "days left", cls: "green" },
+    { num: fmtDec(weeksLeft, 6), lbl: "weeks left", cls: "green" },
     { num: fmt(saturdaysLeft), lbl: "saturdays left", cls: "" },
     { num: fmt(summersLeft), lbl: "summers left", cls: "" },
     { num: fmt(fullMoonsLeft), lbl: "full moons left", cls: "" },
@@ -99,9 +160,9 @@ function renderStats() {
     .join("");
 
   const pct = fracLived() * 100;
-  $("#progress-fill").style.width = pct.toFixed(2) + "%";
-  $("#pct-lived").textContent = pct.toFixed(1) + "% mined";
-  $("#pct-left").textContent = (100 - pct).toFixed(1) + "% unmined";
+  $("#progress-fill").style.width = pct.toFixed(6) + "%";
+  $("#pct-lived").textContent = pct.toFixed(8) + "% mined";
+  $("#pct-left").textContent = (100 - pct).toFixed(8) + "% unmined";
 }
 
 /* ---------- chain view ---------- */
@@ -129,7 +190,7 @@ function renderChain() {
         <div class="bage">AGE ${i}</div>
         <div class="bhash">0x${hash}</div>
         <div class="bnum">${yearStart.getFullYear()}</div>
-        <div class="bstatus">${statusText}</div>
+        <div class="bstatus"${status === "current" ? ' id="current-block-status"' : ""}>${statusText}</div>
       </div>`);
   }
   el.innerHTML = parts.join("");
@@ -223,6 +284,7 @@ function drillInto(viewKey, frame, i) {
 /* ---------- weeks view ---------- */
 function renderWeeks() {
   renderCrumbs("weeks", "#weeks-crumbs");
+  updateCountdownLine("weeks", "#weeks-countdown");
   const grid = $("#weeks");
   const axis = $("#weeks-axis");
 
@@ -289,6 +351,7 @@ function spiralCellLabel(unit, sMs) {
 
 function renderSpiral() {
   renderCrumbs("spiral", "#spiral-crumbs");
+  updateCountdownLine("spiral", "#spiral-countdown");
   const stack = drill.spiral;
   const topFrame = {
     start: state.birth.getTime(),
@@ -493,10 +556,64 @@ function closeExplorer() {
   $("#modal-backdrop").hidden = true;
 }
 
+/* ---------- live countdowns, everywhere, every second ---------- */
+function updateCountdownLine(viewKey, sel) {
+  const stack = drill[viewKey];
+  const t = now().getTime();
+  let frame, name;
+  if (stack.length) {
+    frame = stack[stack.length - 1];
+    name = frame.label;
+  } else {
+    // top level: count down the unit you're living through right now
+    const unit = viewKey === "weeks" ? "week" : "month";
+    const unitMs = UNIT_MS[unit];
+    const idx = Math.max(0, Math.floor((clampedNow() - state.birth) / unitMs));
+    const start = state.birth.getTime() + idx * unitMs;
+    frame = { start, end: Math.min(start + unitMs, state.end.getTime()) };
+    name = viewKey === "weeks" ? "this week" : "this month";
+  }
+  const el = $(sel);
+  if (t < frame.start) {
+    el.className = "frame-countdown";
+    el.textContent = `${name} begins mining in ${dhmsC(frame.start - t)}`;
+  } else if (t < frame.end) {
+    el.className = "frame-countdown";
+    el.textContent = `${name} ends in ${dhmsC(frame.end - t)}`;
+  } else {
+    el.className = "frame-countdown done";
+    el.textContent = `${name} — fully mined ✓`;
+  }
+}
+
+function updateCountdowns() {
+  // chain: the mining block counts down on its face
+  const st = $("#current-block-status");
+  if (st) {
+    const totalYears = Math.ceil((state.end - state.birth) / YEAR_MS);
+    const i = Math.min(
+      totalYears - 1,
+      Math.floor((clampedNow() - state.birth) / YEAR_MS)
+    );
+    const blockEnd = Math.min(
+      state.birth.getTime() + (i + 1) * YEAR_MS,
+      state.end.getTime()
+    );
+    st.textContent = `⛏ ${dhmsC(blockEnd - now().getTime())}`;
+  }
+  updateCountdownLine("weeks", "#weeks-countdown");
+  updateCountdownLine("spiral", "#spiral-countdown");
+  const yearsLeft = Math.max(0, (state.end - now()) / YEAR_MS);
+  $("#hourglass-caption").textContent = `≈ ${yearsLeft.toFixed(8)} years of sand remaining`;
+}
+
 /* ---------- live seconds ticker ---------- */
 function tick() {
   const secs = Math.max(0, (state.end - now()) / 1000);
   $("#seconds-left").textContent = fmt(secs);
+
+  renderStats();
+  updateCountdowns();
 
   // drilled-in views show hours/minutes/seconds — keep "now" moving
   if (drill.weeks.length) renderWeeks();
@@ -518,6 +635,13 @@ function renderAll() {
 function syncInputs() {
   $("#birth").value = iso(state.birth);
   $("#end").value = iso(state.end);
+  const b = lifespanBreakdown(state.birth, state.end);
+  $("#ls-y").value = b.years;
+  $("#ls-mo").value = b.months;
+  $("#ls-d").value = b.days;
+  $("#ls-h").value = b.hours;
+  $("#ls-mi").value = b.minutes;
+  $("#ls-s").value = b.seconds;
 }
 
 function init() {
@@ -527,29 +651,44 @@ function init() {
 
   $("#birth").addEventListener("change", (e) => {
     const d = new Date(e.target.value);
-    if (!isNaN(d)) {
-      state.birth = d;
-      if (state.end <= state.birth)
-        state.end = new Date(state.birth.getTime() + 85 * 365.25 * DAY);
-      syncInputs();
-      save();
-      renderAll();
-    }
+    if (isNaN(d)) return;
+    state.birth = d;
+    // lifespan is the master clock: keep it, recompute the end date
+    let span = readLifespan();
+    if (addLifespan(d, span) <= d) span = { years: 85, months: 0, days: 0, hours: 0, minutes: 0, seconds: 0 };
+    state.end = addLifespan(d, span);
+    syncInputs();
+    save();
+    renderAll();
   });
 
   $("#end").addEventListener("change", (e) => {
     const d = new Date(e.target.value);
     if (!isNaN(d) && d > state.birth) {
       state.end = d;
+      syncInputs(); // re-derive the lifespan breakdown
       save();
       renderAll();
     }
   });
 
+  document.querySelectorAll(".lifespan-inputs input").forEach((inp) => {
+    inp.addEventListener("change", () => {
+      const end = addLifespan(state.birth, readLifespan());
+      if (end <= state.birth) return;
+      state.end = end;
+      syncInputs();
+      save();
+      renderAll();
+    });
+  });
+
   document.querySelectorAll(".preset-btns button").forEach((btn) => {
     btn.addEventListener("click", () => {
-      const years = Number(btn.dataset.years);
-      state.end = new Date(state.birth.getTime() + years * 365.25 * DAY);
+      state.end = addLifespan(state.birth, {
+        years: Number(btn.dataset.years),
+        months: 0, days: 0, hours: 0, minutes: 0, seconds: 0,
+      });
       syncInputs();
       save();
       renderAll();

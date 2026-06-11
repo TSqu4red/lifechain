@@ -25,8 +25,16 @@
       <label for="end">Final block (expected end date)</label>
       <input type="date" id="end">
     </div>
-    <div class="field presets">
-      <label>Quick set lifespan</label>
+    <div class="field lifespan">
+      <label>Lifespan — as precise as you like</label>
+      <div class="lifespan-inputs">
+        <span class="ls-unit"><input type="number" id="ls-y" min="0" max="150"><span>yrs</span></span>
+        <span class="ls-unit"><input type="number" id="ls-mo" min="0" max="11"><span>mos</span></span>
+        <span class="ls-unit"><input type="number" id="ls-d" min="0" max="31"><span>days</span></span>
+        <span class="ls-unit"><input type="number" id="ls-h" min="0" max="23"><span>hrs</span></span>
+        <span class="ls-unit"><input type="number" id="ls-mi" min="0" max="59"><span>min</span></span>
+        <span class="ls-unit"><input type="number" id="ls-s" min="0" max="59"><span>sec</span></span>
+      </div>
       <div class="preset-btns">
         <button data-years="75">75y</button>
         <button data-years="85">85y</button>
@@ -62,6 +70,7 @@
     <section class="view" id="view-weeks">
       <p class="view-hint">Every square is one week. <span class="lgd lgd-lived"></span> lived &nbsp;<span class="lgd lgd-now"></span> this week &nbsp;<span class="lgd lgd-future"></span> remaining<br><strong>Click any week to zoom in: days → hours → minutes → seconds.</strong></p>
       <div class="crumbs" id="weeks-crumbs"></div>
+      <p class="frame-countdown" id="weeks-countdown"></p>
       <div class="weeks-wrap">
         <div class="weeks-axis" id="weeks-axis"></div>
         <div class="weeks-grid" id="weeks"></div>
@@ -71,6 +80,7 @@
     <section class="view" id="view-spiral">
       <p class="view-hint">Your life as a spiral of months, spinning outward from birth.<br><strong>Click a month to spiral into its days — then hours, minutes, seconds.</strong></p>
       <div class="crumbs" id="spiral-crumbs"></div>
+      <p class="frame-countdown" id="spiral-countdown"></p>
       <div class="svg-wrap" id="spiral"></div>
     </section>
 
