@@ -120,7 +120,7 @@ function renderChain() {
     if (i > 0)
       parts.push(`<div class="chain-link ${i <= curYearIdx ? "mined" : ""}"></div>`);
     parts.push(`
-      <div class="block ${status}" ${status === "current" ? 'id="current-block"' : ""}>
+      <div class="block ${status}" data-idx="${i}" ${status === "current" ? 'id="current-block"' : ""}>
         <div class="bnum">BLOCK #${i}</div>
         <div class="bage">AGE ${i}</div>
         <div class="bhash">0x${hash}</div>
@@ -246,6 +246,121 @@ function renderHourglass() {
   $("#hourglass-caption").textContent = `≈ ${yearsLeft.toFixed(1)} years of sand remaining`;
 }
 
+/* ---------- block explorer (click a block) ---------- */
+const YEAR_MS = DAY * 365.25;
+let openIdx = null;
+let explorerTimer = null;
+
+function pad2(n) {
+  return String(n).padStart(2, "0");
+}
+
+/* "412d 07h 33m 21s" style breakdown */
+function dhms(ms) {
+  ms = Math.max(0, ms);
+  const d = Math.floor(ms / DAY);
+  const h = Math.floor((ms % DAY) / 3600000);
+  const m = Math.floor((ms % 3600000) / 60000);
+  const s = Math.floor((ms % 60000) / 1000);
+  return `${d}d ${pad2(h)}h ${pad2(m)}m ${pad2(s)}s`;
+}
+
+/* BTC-style: 16 decimal places, ticking live */
+function btc(frac) {
+  return (frac * 100).toFixed(16) + " %";
+}
+
+function blockBounds(i) {
+  const start = new Date(state.birth.getTime() + i * YEAR_MS);
+  const fullEnd = new Date(state.birth.getTime() + (i + 1) * YEAR_MS);
+  const end = new Date(Math.min(fullEnd.getTime(), state.end.getTime()));
+  return { start, end, clipped: fullEnd > state.end };
+}
+
+function fmtDateTime(d) {
+  return d.toLocaleDateString("en-US", {
+    year: "numeric", month: "short", day: "numeric",
+  });
+}
+
+function renderExplorer() {
+  if (openIdx === null) return;
+  const i = openIdx;
+  const totalYears = Math.ceil((state.end - state.birth) / YEAR_MS);
+  const curYearIdx = Math.min(
+    totalYears - 1,
+    Math.floor((clampedNow() - state.birth) / YEAR_MS)
+  );
+  const status = i < curYearIdx ? "past" : i === curYearIdx ? "current" : "future";
+  const statusText =
+    status === "past" ? "✓ CONFIRMED" : status === "current" ? "⛏ MINING…" : "◌ PENDING";
+  const { start, end, clipped } = blockBounds(i);
+  const t = now().getTime();
+
+  // fill fraction of this block, against a full year
+  const fill = Math.min(
+    Math.max((t - start.getTime()) / YEAR_MS, 0),
+    (end.getTime() - start.getTime()) / YEAR_MS
+  );
+  const confirmations = Math.max(0, curYearIdx - i);
+  const chainFrac = fracLived();
+
+  const rows = [
+    ["block height", `#${i}`, ""],
+    ["age", `${i} → ${i + 1}`, ""],
+    ["hash", "0x" + pseudoHash(iso(state.birth) + ":" + i), ""],
+    ["timespan", `${fmtDateTime(start)} → ${fmtDateTime(end)}`, ""],
+    ["confirmations", String(confirmations), confirmations ? "gold" : ""],
+    ["block fill", btc(fill), status === "current" ? "green" : status === "past" ? "gold" : ""],
+  ];
+
+  if (status === "current") {
+    rows.push(
+      ["elapsed in block", dhms(t - start.getTime()), "green"],
+      ["remaining in block", dhms(end.getTime() - t), "red"],
+      ["seconds elapsed", fmt((t - start.getTime()) / 1000), "green"],
+      ["seconds remaining", fmt((end.getTime() - t) / 1000), "red"]
+    );
+  } else if (status === "future") {
+    rows.push(["mining begins in", dhms(start.getTime() - t), "red"]);
+  } else {
+    rows.push(["mined for", dhms(end.getTime() - start.getTime()), "gold"]);
+  }
+
+  rows.push(["chain progress", btc(chainFrac), "gold"]);
+  if (clipped) rows.push(["note", "final block — the chain ends mid-block", "red"]);
+
+  $("#modal-body").innerHTML = `
+    <div class="exp-header">Lifechain Block Explorer</div>
+    <div class="exp-title ${status}">BLOCK #${i}</div>
+    <div class="exp-status ${status}">${statusText}</div>
+    <div class="exp-rows">
+      ${rows
+        .map(
+          ([k, v, cls]) =>
+            `<div class="exp-row"><span class="k">${k}</span><span class="v ${cls}">${v}</span></div>`
+        )
+        .join("")}
+    </div>
+    <div class="exp-fill-bar"><div style="width:${(fill * 100).toFixed(4)}%"></div></div>
+    <div class="exp-note">precision: 16 decimals, like the good ledgers · updates live</div>`;
+}
+
+function openBlock(i) {
+  openIdx = i;
+  $("#modal-backdrop").hidden = false;
+  renderExplorer();
+  clearInterval(explorerTimer);
+  explorerTimer = setInterval(renderExplorer, 80);
+}
+
+function closeExplorer() {
+  openIdx = null;
+  clearInterval(explorerTimer);
+  explorerTimer = null;
+  $("#modal-backdrop").hidden = true;
+}
+
 /* ---------- live seconds ticker ---------- */
 function tick() {
   const secs = Math.max(0, (state.end - now()) / 1000);
@@ -310,6 +425,19 @@ function init() {
       tab.classList.add("active");
       $("#view-" + tab.dataset.view).classList.add("active");
     });
+  });
+
+  // block explorer: delegate clicks so re-renders don't lose handlers
+  $("#chain").addEventListener("click", (e) => {
+    const block = e.target.closest(".block");
+    if (block) openBlock(Number(block.dataset.idx));
+  });
+  $("#modal-close").addEventListener("click", closeExplorer);
+  $("#modal-backdrop").addEventListener("click", (e) => {
+    if (e.target === e.currentTarget) closeExplorer();
+  });
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") closeExplorer();
   });
 
   setInterval(tick, 1000);

@@ -55,7 +55,7 @@
 
   <main>
     <section class="view active" id="view-chain">
-      <p class="view-hint">One block per year of your life. Confirmed blocks can never be re-mined.</p>
+      <p class="view-hint">One block per year of your life. Confirmed blocks can never be re-mined. <strong>Click any block to inspect it.</strong></p>
       <div class="chain-scroll" id="chain"></div>
     </section>
 
@@ -83,6 +83,13 @@
     <span class="ticker-label">seconds remaining</span>
     <span class="ticker-value" id="seconds-left">—</span>
   </section>
+
+  <div class="modal-backdrop" id="modal-backdrop" hidden>
+    <div class="modal" role="dialog" aria-modal="true">
+      <button class="modal-close" id="modal-close" aria-label="Close">×</button>
+      <div id="modal-body"></div>
+    </div>
+  </div>
 
   <footer class="site-footer">
     <p>Memento mori. Built with no dependencies, like all good chains. Data never leaves your browser.</p>
