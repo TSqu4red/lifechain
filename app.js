@@ -406,8 +406,27 @@ function renderSpiral() {
 }
 
 /* ---------- hourglass view ---------- */
+const HG_SCOPES = ["life", "year", "month", "week", "day", "hour", "minute"];
+let hgScope = "life";
+
+/* the birth-anchored frame of the chosen scope that contains right now */
+function hgFrame() {
+  if (hgScope === "life")
+    return { start: state.birth.getTime(), end: state.end.getTime() };
+  const unitMs = hgScope === "year" ? YEAR_MS : UNIT_MS[hgScope];
+  const idx = Math.max(0, Math.floor((clampedNow() - state.birth) / unitMs));
+  const start = state.birth.getTime() + idx * unitMs;
+  return { start, end: Math.min(start + unitMs, state.end.getTime()) };
+}
+
 function renderHourglass() {
-  const f = fracLived();
+  $("#hourglass-scopes").innerHTML = HG_SCOPES.map(
+    (s) => `<button data-scope="${s}" class="${s === hgScope ? "active" : ""}">${s}</button>`
+  ).join("");
+
+  const { start, end } = hgFrame();
+  const t = now().getTime();
+  const f = Math.min(1, Math.max(0, (t - start) / (end - start || 1)));
   const remaining = 1 - f;
 
   // chambers: top y 20→145 (apex bottom), bottom y 155→280 (apex top)
@@ -439,11 +458,18 @@ function renderHourglass() {
           : ""
       }
       <text x="150" y="310" text-anchor="middle" fill="var(--muted)"
-        font-family="JetBrains Mono, monospace" font-size="11">${(remaining * 100).toFixed(1)}% still in the top</text>
+        font-family="JetBrains Mono, monospace" font-size="11">${(remaining * 100).toFixed(hgScope === "minute" ? 1 : 6)}% still in the top</text>
     </svg>`;
 
-  const yearsLeft = (state.end - clampedNow()) / YEAR_MS;
-  $("#hourglass-caption").textContent = `≈ ${yearsLeft.toFixed(1)} years of sand remaining`;
+  if (hgScope === "life") {
+    const yearsLeft = Math.max(0, (state.end - now()) / YEAR_MS);
+    $("#hourglass-caption").textContent = `≈ ${yearsLeft.toFixed(8)} years of sand remaining`;
+  } else {
+    $("#hourglass-caption").textContent =
+      t >= end
+        ? `this ${hgScope} has fully drained ✓`
+        : `this ${hgScope} drains in ${dhmsC(end - t)}`;
+  }
 }
 
 /* ---------- block explorer (click a block) ---------- */
@@ -603,8 +629,7 @@ function updateCountdowns() {
   }
   updateCountdownLine("weeks", "#weeks-countdown");
   updateCountdownLine("spiral", "#spiral-countdown");
-  const yearsLeft = Math.max(0, (state.end - now()) / YEAR_MS);
-  $("#hourglass-caption").textContent = `≈ ${yearsLeft.toFixed(8)} years of sand remaining`;
+  renderHourglass(); // sand level, % and drain countdown all move every second
 }
 
 /* ---------- live seconds ticker ---------- */
@@ -748,6 +773,18 @@ function init() {
       ? drill.spiral[drill.spiral.length - 1]
       : { start: state.birth.getTime(), end: state.end.getTime(), unit: "month" };
     if (drillInto("spiral", frame, i)) renderSpiral();
+  });
+
+  // hourglass: chips pick a scope, clicking the glass cycles to the next
+  $("#hourglass-scopes").addEventListener("click", (e) => {
+    const b = e.target.closest("button[data-scope]");
+    if (!b) return;
+    hgScope = b.dataset.scope;
+    renderHourglass();
+  });
+  $("#hourglass").addEventListener("click", () => {
+    hgScope = HG_SCOPES[(HG_SCOPES.indexOf(hgScope) + 1) % HG_SCOPES.length];
+    renderHourglass();
   });
 
   // breadcrumbs pop back up the stack

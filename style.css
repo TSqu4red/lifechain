@@ -336,6 +336,14 @@ body {
 }
 .frame-countdown.done { color: var(--lived); }
 
+.crumbs button.active {
+  background: var(--lived);
+  border-color: var(--lived);
+  color: #0a0e14;
+  font-weight: 700;
+}
+#hourglass svg { cursor: pointer; }
+
 .drill-grid { display: grid; gap: 10px; }
 .drill-grid[data-unit="day"] { grid-template-columns: repeat(7, 84px); grid-auto-rows: 84px; }
 .drill-grid[data-unit="hour"] { grid-template-columns: repeat(6, 76px); grid-auto-rows: 76px; }
