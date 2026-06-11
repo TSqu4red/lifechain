@@ -4,6 +4,7 @@ const $ = (s) => document.querySelector(s);
 
 const DAY = 86400000;
 const WEEK = DAY * 7;
+const YEAR_MS = DAY * 365.25;
 
 const state = {
   birth: new Date("1990-06-15"),
@@ -63,6 +64,9 @@ function pseudoHash(str) {
 function fmt(n) {
   return Math.round(n).toLocaleString("en-US");
 }
+function pad2(n) {
+  return String(n).padStart(2, "0");
+}
 
 /* ---------- stats ---------- */
 function renderStats() {
@@ -103,11 +107,11 @@ function renderStats() {
 /* ---------- chain view ---------- */
 function renderChain() {
   const el = $("#chain");
-  const totalYears = Math.ceil((state.end - state.birth) / (DAY * 365.25));
+  const totalYears = Math.ceil((state.end - state.birth) / YEAR_MS);
   const n = clampedNow();
   const curYearIdx = Math.min(
     totalYears - 1,
-    Math.floor((n - state.birth) / (DAY * 365.25))
+    Math.floor((n - state.birth) / YEAR_MS)
   );
 
   const parts = [];
@@ -115,7 +119,7 @@ function renderChain() {
     const status = i < curYearIdx ? "past" : i === curYearIdx ? "current" : "future";
     const statusText =
       status === "past" ? "✓ CONFIRMED" : status === "current" ? "⛏ MINING…" : "PENDING";
-    const yearStart = new Date(state.birth.getTime() + i * DAY * 365.25);
+    const yearStart = new Date(state.birth.getTime() + i * YEAR_MS);
     const hash = pseudoHash(iso(state.birth) + ":" + i);
     if (i > 0)
       parts.push(`<div class="chain-link ${i <= curYearIdx ? "mined" : ""}"></div>`);
@@ -134,73 +138,206 @@ function renderChain() {
   if (cur) cur.scrollIntoView({ block: "nearest", inline: "center" });
 }
 
+/* ---------- drill-down engine (shared by weeks + spiral) ----------
+   A drill stack frame is { start, end, unit, label } where `unit` is
+   the unit of the cells INSIDE that frame. Empty stack = top level. */
+const UNIT_MS = {
+  month: DAY * 30.44,
+  week: WEEK,
+  day: DAY,
+  hour: 3600000,
+  minute: 60000,
+  second: 1000,
+};
+const NEXT_UNIT = {
+  month: "day",
+  week: "day",
+  day: "hour",
+  hour: "minute",
+  minute: "second",
+  second: null,
+};
+
+const drill = { weeks: [], spiral: [] };
+
+function buildCells(frame) {
+  const unitMs = UNIT_MS[frame.unit];
+  const count = Math.max(1, Math.ceil((frame.end - frame.start) / unitMs));
+  const t = now().getTime();
+  const cells = [];
+  for (let i = 0; i < count; i++) {
+    const s = frame.start + i * unitMs;
+    const e = Math.min(s + unitMs, frame.end);
+    cells.push({ s, e, status: e <= t ? "lived" : s > t ? "future" : "now" });
+  }
+  return cells;
+}
+
+/* Breadcrumb label for a clicked cell of the given unit. */
+function frameLabel(unit, d) {
+  if (unit === "month")
+    return d.toLocaleDateString("en-US", { month: "short", year: "numeric" });
+  if (unit === "day")
+    return d.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
+  if (unit === "hour") return `${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
+  if (unit === "minute")
+    return `${pad2(d.getHours())}:${pad2(d.getMinutes())}:${pad2(d.getSeconds())}`;
+  return "";
+}
+
+/* Text shown inside a drill cell. */
+function cellContent(unit, sMs) {
+  const d = new Date(sMs);
+  if (unit === "day")
+    return `<span class="sml">${d.toLocaleDateString("en-US", { weekday: "short" })}</span><span class="big">${d.getDate()}</span>`;
+  if (unit === "hour")
+    return `<span class="big">${pad2(d.getHours())}:${pad2(d.getMinutes())}</span>`;
+  if (unit === "minute") return `<span class="big">:${pad2(d.getMinutes())}</span>`;
+  return `<span class="big">${pad2(d.getSeconds())}</span><span class="sml">sec</span>`;
+}
+
+function renderCrumbs(viewKey, sel) {
+  const stack = drill[viewKey];
+  const parts = [`<button data-depth="0">⌂ life</button>`];
+  stack.forEach((f, i) =>
+    parts.push(`<span>▸</span><button data-depth="${i + 1}">${f.label}</button>`)
+  );
+  $(sel).innerHTML = parts.join("");
+}
+
+/* Push a child frame for cell i of the current frame. */
+function drillInto(viewKey, frame, i) {
+  const next = NEXT_UNIT[frame.unit];
+  if (!next) return false;
+  const unitMs = UNIT_MS[frame.unit];
+  const s = frame.start + i * unitMs;
+  drill[viewKey].push({
+    start: s,
+    end: Math.min(s + unitMs, frame.end),
+    unit: next,
+    label: frameLabel(frame.unit, new Date(s)),
+  });
+  return true;
+}
+
 /* ---------- weeks view ---------- */
 function renderWeeks() {
+  renderCrumbs("weeks", "#weeks-crumbs");
   const grid = $("#weeks");
   const axis = $("#weeks-axis");
-  const totalWeeks = Math.min(
-    6240, // 120 years cap
-    Math.ceil((state.end - state.birth) / WEEK)
-  );
-  const curWeek = Math.min(
-    totalWeeks - 1,
-    Math.floor((clampedNow() - state.birth) / WEEK)
-  );
 
-  const frag = [];
-  for (let i = 0; i < totalWeeks; i++) {
-    const cls = i < curWeek ? "wk lived" : i === curWeek ? "wk now" : "wk";
-    const age = Math.floor(i / 52);
-    frag.push(`<div class="${cls}" title="week ${i + 1} · age ${age}"></div>`);
-  }
-  grid.innerHTML = frag.join("");
+  if (drill.weeks.length === 0) {
+    grid.className = "weeks-grid";
+    grid.removeAttribute("data-unit");
+    const totalWeeks = Math.min(
+      6240, // 120 years cap
+      Math.ceil((state.end - state.birth) / WEEK)
+    );
+    const curWeek = Math.min(
+      totalWeeks - 1,
+      Math.floor((clampedNow() - state.birth) / WEEK)
+    );
 
-  // age labels every 10 years (each row = 52 weeks ≈ 1 year, 13px row pitch)
-  const rows = Math.ceil(totalWeeks / 52);
-  const labels = [];
-  for (let y = 0; y < rows; y++) {
-    labels.push(`<span>${y % 10 === 0 ? y : ""}</span>`);
+    const frag = [];
+    for (let i = 0; i < totalWeeks; i++) {
+      const cls = i < curWeek ? "wk lived" : i === curWeek ? "wk now" : "wk";
+      const age = Math.floor(i / 52);
+      frag.push(`<div class="${cls}" data-i="${i}" title="week ${i + 1} · age ${age}"></div>`);
+    }
+    grid.innerHTML = frag.join("");
+
+    // age labels every 10 years (each row = 52 weeks ≈ 1 year, 13px row pitch)
+    const rows = Math.ceil(totalWeeks / 52);
+    const labels = [];
+    for (let y = 0; y < rows; y++) {
+      labels.push(`<span>${y % 10 === 0 ? y : ""}</span>`);
+    }
+    axis.innerHTML = labels.join("");
+    return;
   }
-  axis.innerHTML = labels.join("");
+
+  axis.innerHTML = "";
+  const frame = drill.weeks[drill.weeks.length - 1];
+  const cells = buildCells(frame);
+  const leaf = NEXT_UNIT[frame.unit] ? "" : " leaf";
+  grid.className = "drill-grid";
+  grid.dataset.unit = frame.unit;
+  grid.innerHTML = cells
+    .map(
+      (c, i) =>
+        `<div class="dcell ${c.status}${leaf}" data-i="${i}" title="${new Date(c.s).toLocaleString()}">${cellContent(frame.unit, c.s)}</div>`
+    )
+    .join("");
 }
 
 /* ---------- spiral view ---------- */
+function spiralParams(n) {
+  if (n <= 26) return { turns: 1.5, rMin: 80, dotR: 14, font: 11 };
+  if (n <= 40) return { turns: 1.8, rMin: 80, dotR: 13, font: 10 };
+  if (n <= 70) return { turns: 2.5, rMin: 80, dotR: 10, font: 8 };
+  return { turns: Math.max(4, Math.ceil(n / 160)), rMin: 18, dotR: 3.4, font: 0 };
+}
+
+function spiralCellLabel(unit, sMs) {
+  const d = new Date(sMs);
+  if (unit === "day") return String(d.getDate());
+  if (unit === "hour") return pad2(d.getHours());
+  if (unit === "minute") return pad2(d.getMinutes());
+  if (unit === "second") return pad2(d.getSeconds());
+  return "";
+}
+
 function renderSpiral() {
-  const totalMonths = Math.ceil((state.end - state.birth) / (DAY * 30.44));
-  const curMonth = Math.floor((clampedNow() - state.birth) / (DAY * 30.44));
+  renderCrumbs("spiral", "#spiral-crumbs");
+  const stack = drill.spiral;
+  const topFrame = {
+    start: state.birth.getTime(),
+    end: state.end.getTime(),
+    unit: "month",
+  };
+  const frame = stack.length ? stack[stack.length - 1] : topFrame;
+  const cells = buildCells(frame);
+  const center = stack.length ? frame.label : "birth";
+  const clickable = !!NEXT_UNIT[frame.unit];
+
+  const n = cells.length;
   const size = 600;
   const cx = size / 2;
   const cy = size / 2;
-  const turns = Math.max(4, Math.ceil(totalMonths / 160));
-  const rMin = 18;
-  const rMax = size / 2 - 24;
+  const p = spiralParams(n);
+  const rMax = size / 2 - 24 - p.dotR;
 
   let dots = "";
-  for (let i = 0; i < totalMonths; i++) {
-    const t = i / (totalMonths - 1);
-    const theta = t * turns * Math.PI * 2 - Math.PI / 2;
-    const r = rMin + t * (rMax - rMin);
+  cells.forEach((c, i) => {
+    const t = n === 1 ? 0 : i / (n - 1);
+    const theta = t * p.turns * Math.PI * 2 - Math.PI / 2;
+    const r = p.rMin + t * (rMax - p.rMin);
     const x = (cx + r * Math.cos(theta)).toFixed(1);
     const y = (cy + r * Math.sin(theta)).toFixed(1);
     let fill, radius, extra = "";
-    if (i < curMonth) {
+    if (c.status === "lived") {
       fill = "var(--lived)";
-      radius = 3.4;
-    } else if (i === curMonth) {
+      radius = p.dotR;
+    } else if (c.status === "now") {
       fill = "var(--now)";
-      radius = 7;
-      extra = ` style="filter: drop-shadow(0 0 6px var(--now))"`;
+      radius = p.font ? p.dotR + 3 : 7;
+      extra = ` filter="drop-shadow(0 0 6px var(--now))"`;
     } else {
       fill = "var(--future)";
-      radius = 3.4;
+      radius = p.dotR;
     }
-    dots += `<circle cx="${x}" cy="${y}" r="${radius}" fill="${fill}"${extra}/>`;
-  }
+    const label = p.font
+      ? `<text x="${x}" y="${y}" text-anchor="middle" dominant-baseline="central"
+          font-family="JetBrains Mono, monospace" font-size="${p.font}" font-weight="700"
+          fill="${c.status === "future" ? "var(--muted)" : "#0a0e14"}">${spiralCellLabel(frame.unit, c.s)}</text>`
+      : "";
+    dots += `<g data-i="${i}" style="cursor:${clickable ? "pointer" : "default"}"><circle cx="${x}" cy="${y}" r="${radius}" fill="${fill}"${extra}/>${label}</g>`;
+  });
 
   $("#spiral").innerHTML = `
     <svg viewBox="0 0 ${size} ${size}" xmlns="http://www.w3.org/2000/svg">
       <text x="${cx}" y="${cy + 4}" text-anchor="middle" fill="var(--muted)"
-        font-family="JetBrains Mono, monospace" font-size="11">birth</text>
+        font-family="JetBrains Mono, monospace" font-size="12">${center}</text>
       ${dots}
     </svg>`;
 }
@@ -242,18 +379,13 @@ function renderHourglass() {
         font-family="JetBrains Mono, monospace" font-size="11">${(remaining * 100).toFixed(1)}% still in the top</text>
     </svg>`;
 
-  const yearsLeft = (state.end - clampedNow()) / (DAY * 365.25);
+  const yearsLeft = (state.end - clampedNow()) / YEAR_MS;
   $("#hourglass-caption").textContent = `≈ ${yearsLeft.toFixed(1)} years of sand remaining`;
 }
 
 /* ---------- block explorer (click a block) ---------- */
-const YEAR_MS = DAY * 365.25;
 let openIdx = null;
 let explorerTimer = null;
-
-function pad2(n) {
-  return String(n).padStart(2, "0");
-}
 
 /* "412d 07h 33m 21s" style breakdown */
 function dhms(ms) {
@@ -365,10 +497,16 @@ function closeExplorer() {
 function tick() {
   const secs = Math.max(0, (state.end - now()) / 1000);
   $("#seconds-left").textContent = fmt(secs);
+
+  // drilled-in views show hours/minutes/seconds — keep "now" moving
+  if (drill.weeks.length) renderWeeks();
+  if (drill.spiral.length) renderSpiral();
 }
 
 /* ---------- wiring ---------- */
 function renderAll() {
+  drill.weeks.length = 0;
+  drill.spiral.length = 0;
   renderStats();
   renderChain();
   renderWeeks();
@@ -439,6 +577,51 @@ function init() {
   document.addEventListener("keydown", (e) => {
     if (e.key === "Escape") closeExplorer();
   });
+
+  // weeks drill-down: week → days → hours → minutes → seconds
+  $("#weeks").addEventListener("click", (e) => {
+    if (drill.weeks.length === 0) {
+      const wk = e.target.closest(".wk");
+      if (!wk) return;
+      const i = Number(wk.dataset.i);
+      const start = state.birth.getTime() + i * WEEK;
+      drill.weeks.push({
+        start,
+        end: Math.min(start + WEEK, state.end.getTime()),
+        unit: "day",
+        label: `Week ${i + 1}`,
+      });
+      renderWeeks();
+    } else {
+      const cell = e.target.closest(".dcell");
+      if (!cell) return;
+      const frame = drill.weeks[drill.weeks.length - 1];
+      if (drillInto("weeks", frame, Number(cell.dataset.i))) renderWeeks();
+    }
+  });
+
+  // spiral drill-down: month → days → hours → minutes → seconds
+  $("#spiral").addEventListener("click", (e) => {
+    const g = e.target.closest("g[data-i]");
+    if (!g) return;
+    const i = Number(g.dataset.i);
+    const frame = drill.spiral.length
+      ? drill.spiral[drill.spiral.length - 1]
+      : { start: state.birth.getTime(), end: state.end.getTime(), unit: "month" };
+    if (drillInto("spiral", frame, i)) renderSpiral();
+  });
+
+  // breadcrumbs pop back up the stack
+  [["#weeks-crumbs", "weeks", renderWeeks], ["#spiral-crumbs", "spiral", renderSpiral]].forEach(
+    ([sel, key, render]) => {
+      $(sel).addEventListener("click", (e) => {
+        const b = e.target.closest("button[data-depth]");
+        if (!b) return;
+        drill[key].length = Number(b.dataset.depth);
+        render();
+      });
+    }
+  );
 
   setInterval(tick, 1000);
 }
