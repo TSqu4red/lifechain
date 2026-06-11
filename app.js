@@ -146,24 +146,24 @@ function renderStats() {
   const blinks = daysLived * 14400; // ~15/min, awake ~16h/day
 
   const items = [
-    { num: fmtDec(daysLived, 5), lbl: "days mined", cls: "gold" },
-    { num: fmtDec(daysLeft, 5), lbl: "days left", cls: "green" },
-    { num: fmtDec(weeksLeft, 6), lbl: "weeks left", cls: "green" },
-    { num: fmt(saturdaysLeft), lbl: "saturdays left", cls: "" },
-    { num: fmt(summersLeft), lbl: "summers left", cls: "" },
-    { num: fmt(fullMoonsLeft), lbl: "full moons left", cls: "" },
-    { num: fmt(tradingDaysLeft), lbl: "trading days left", cls: "green" },
-    { num: fmt(booksLeft), lbl: "books you could still read", cls: "" },
-    { num: fmt(olympicsLeft), lbl: "olympics left", cls: "" },
-    { num: fmt(heartbeats), lbl: "heartbeats so far", cls: "gold" },
-    { num: fmt(breaths), lbl: "breaths so far", cls: "gold" },
-    { num: fmt(blinks), lbl: "blinks so far", cls: "gold" },
+    { num: fmtDec(daysLived, 5), lbl: "days mined", cls: "gold", t: "calendar days since your genesis block" },
+    { num: fmtDec(daysLeft, 5), lbl: "days left", cls: "green", t: "calendar days until your final block" },
+    { num: fmtDec(weeksLeft, 6), lbl: "weeks left", cls: "green", t: "one row of the weeks grid per year" },
+    { num: fmt(saturdaysLeft), lbl: "saturdays left", cls: "", t: "one per remaining week" },
+    { num: fmt(summersLeft), lbl: "summers left", cls: "", t: "whole years remaining" },
+    { num: fmt(fullMoonsLeft), lbl: "full moons left", cls: "", t: "one every 29.53 days" },
+    { num: fmt(tradingDaysLeft), lbl: "trading days left", cls: "green", t: "~252 market sessions per year" },
+    { num: fmt(booksLeft), lbl: "books you could still read", cls: "", t: "at a book a month" },
+    { num: fmt(olympicsLeft), lbl: "olympics left", cls: "", t: "summer games, every 4 years" },
+    { num: fmt(heartbeats), lbl: "heartbeats so far", cls: "gold", t: "~70 beats per minute" },
+    { num: fmt(breaths), lbl: "breaths so far", cls: "gold", t: "~16 breaths per minute" },
+    { num: fmt(blinks), lbl: "blinks so far", cls: "gold", t: "~15 blinks per minute, awake ~16h a day" },
   ];
 
   $("#stats").innerHTML = items
     .map(
       (it) =>
-        `<div class="stat"><div class="num ${it.cls}">${it.num}</div><div class="lbl">${it.lbl}</div></div>`
+        `<div class="stat" title="${it.t}"><div class="num ${it.cls}">${it.num}</div><div class="lbl">${it.lbl}</div></div>`
     )
     .join("");
 
@@ -442,7 +442,7 @@ function renderSpiral() {
     const label = p.font
       ? `<text x="${x}" y="${y}" text-anchor="middle" dominant-baseline="central"
           font-family="JetBrains Mono, monospace" font-size="${p.font}" font-weight="700"
-          fill="${c.status === "future" ? "var(--muted)" : "#0a0e14"}">${spiralCellLabel(frame.unit, c.s)}</text>`
+          fill="${c.status === "future" ? "var(--muted)" : "#0d0905"}">${spiralCellLabel(frame.unit, c.s)}</text>`
       : "";
     dots += `<g data-i="${i}" style="cursor:${clickable ? "pointer" : "default"}"><circle cx="${x}" cy="${y}" r="${radius}" fill="${fill}"${extra}/>${label}</g>`;
   });
@@ -730,6 +730,8 @@ function init() {
   $("#birth").addEventListener("change", (e) => {
     const d = new Date(e.target.value);
     if (isNaN(d)) return;
+    const glowing = $(".step.attention");
+    if (glowing) glowing.classList.remove("attention");
     state.birth = d;
     // lifespan is the master clock: keep it, recompute the end date
     let span = readLifespan();
@@ -779,8 +781,42 @@ function init() {
       document.querySelectorAll(".view").forEach((v) => v.classList.remove("active"));
       tab.classList.add("active");
       $("#view-" + tab.dataset.view).classList.add("active");
+      localStorage.setItem("lifechain-view", tab.dataset.view);
     });
   });
+  const savedView = localStorage.getItem("lifechain-view");
+  if (savedView && $(`.tab[data-view="${savedView}"]`))
+    $(`.tab[data-view="${savedView}"]`).click();
+
+  // share your chain (the whole point of having frens)
+  $("#share-btn").addEventListener("click", async () => {
+    const pct = (fracLived() * 100).toFixed(1);
+    const daysLeft = Math.round((state.end - clampedNow()) / DAY);
+    const text = `I've mined ${pct}% of my lifechain — ${daysLeft.toLocaleString("en-US")} days left on the chain. Forge yours:`;
+    const url = "https://lifechain-tau.vercel.app";
+    const payload = `${text} ${url}`;
+    if (navigator.share) {
+      try { await navigator.share({ text, url }); return; } catch (_) {}
+    }
+    let copied = false;
+    try {
+      await navigator.clipboard.writeText(payload);
+      copied = true;
+    } catch (_) {
+      const ta = document.createElement("textarea");
+      ta.value = payload;
+      document.body.appendChild(ta);
+      ta.select();
+      try { copied = document.execCommand("copy"); } catch (_) {}
+      ta.remove();
+    }
+    const b = $("#share-btn");
+    b.textContent = copied ? "copied ✓" : payload;
+    setTimeout(() => (b.textContent = "⛓ share your chain"), 2500);
+  });
+
+  // first visit: glow step 1 until they claim their genesis block
+  if (!localStorage.getItem("lifechain")) $(".step").classList.add("attention");
 
   // block explorer: delegate clicks so re-renders don't lose handlers
   $("#chain").addEventListener("click", (e) => {
