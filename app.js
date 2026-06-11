@@ -140,6 +140,10 @@ function renderStats() {
   const fullMoonsLeft = Math.floor(daysLeft / 29.53);
   const heartbeats = daysLived * 24 * 60 * 70; // ~70 bpm
   const booksLeft = Math.floor((daysLeft / 365.25) * 12); // 12 books/yr
+  const tradingDaysLeft = Math.floor(daysLeft * (252 / 365.25)); // ~252 sessions/yr
+  const olympicsLeft = Math.floor(daysLeft / 365.25 / 4);
+  const breaths = daysLived * 24 * 60 * 16; // ~16/min
+  const blinks = daysLived * 14400; // ~15/min, awake ~16h/day
 
   const items = [
     { num: fmtDec(daysLived, 5), lbl: "days mined", cls: "gold" },
@@ -148,8 +152,12 @@ function renderStats() {
     { num: fmt(saturdaysLeft), lbl: "saturdays left", cls: "" },
     { num: fmt(summersLeft), lbl: "summers left", cls: "" },
     { num: fmt(fullMoonsLeft), lbl: "full moons left", cls: "" },
+    { num: fmt(tradingDaysLeft), lbl: "trading days left", cls: "green" },
     { num: fmt(booksLeft), lbl: "books you could still read", cls: "" },
+    { num: fmt(olympicsLeft), lbl: "olympics left", cls: "" },
     { num: fmt(heartbeats), lbl: "heartbeats so far", cls: "gold" },
+    { num: fmt(breaths), lbl: "breaths so far", cls: "gold" },
+    { num: fmt(blinks), lbl: "blinks so far", cls: "gold" },
   ];
 
   $("#stats").innerHTML = items
