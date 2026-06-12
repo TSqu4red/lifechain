@@ -1,4 +1,4 @@
-# ⛓ Lifechain
+# ⛓ MyLifechain
 
 **Like sands through the hourglass… these links make up the blocks of our lives.**
 

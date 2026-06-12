@@ -602,7 +602,7 @@ function renderExplorer() {
   if (clipped) rows.push(["note", "final block — the chain ends mid-block", "red"]);
 
   $("#modal-body").innerHTML = `
-    <div class="exp-header">Lifechain Block Explorer</div>
+    <div class="exp-header">MyLifechain Block Explorer</div>
     <div class="exp-title ${status}">BLOCK #${i}</div>
     <div class="exp-status ${status}">${statusText}</div>
     <div class="exp-rows">
